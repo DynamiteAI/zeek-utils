@@ -10,56 +10,71 @@ export {
     redef record Conn::Info += {
         orientation: string &log &optional;
     };
+    
+    const LOCAL: string = "local";
+    const NEIGHBOR: string = "neighbor";
+    const EXTERNAL: string = "external";
+    const MULTICAST: string = "multicast";
+    const BROADCAST: string = "broadcast";
+    const INTERNAL: string = "internal";
+    const EGRESS: string = "egress";
+    const INGRESS: string = "ingress";
+    const TO_NEIGHBOR: string = "to_neighbor";
+    const FROM_NEIGHBOR: string = "from_neighbor"; 
+    const UNKNOWN: string = "unknown";
 }
 
 function get_oriented(id: conn_id): string
     {
+    if ( |Site::local_nets| == 0 )
+        return UNKNOWN;
+
     local o = "";
     local r = "";
 
     # test orig 
     if ( Site::is_local_addr(id$orig_h) )
-        o = "local";
+        o = LOCAL;
     else if ( Site::is_neighbor_addr(id$orig_h))
-        o = "neighbor";
+        o = NEIGHBOR;
     else 
-        o = "external";
+        o = EXTERNAL;
 
     # test resp 
     if ( Site::is_local_addr(id$resp_h) )
-        r = "local";
+        r = LOCAL;
     else if ( Site::is_neighbor_addr(id$resp_h))
-        r = "neighbor";
+        r = NEIGHBOR;
     else if ( id$resp_h in 224.0.0.0/4 )
-        r = "multicast";    
+        r = MULTICAST;    
     else if ( /^255\./ in cat(id$resp_h) || /\.255$/ in cat(id$resp_h) )
-        r = "broadcast";    
+        r = BROADCAST;    
     else 
-        r = "external";
+        r = EXTERNAL;
 
     # now evaluate 
-    if ( o == "local" && r == "local" )
-        return "internal";
-    else if ( o == "local" && r == "external" )
-        return "egress";
-    else if ( o == "external" && r == "local" )
-        return "ingress";
-    else if ( o == "external" && r == "external" )
-        return "external";
-    else if ( o == "local" && r == "neighbor" ) 
-        return "to_neighbor";
-    else if ( o == "neighbor" && r == "local" )
-        return "from_neighbor";
-    else if ( o == "local" && r == "multicast")
-        return "multicast";
-    else if ( o == "local" && r == "broadcast")
-        return "broadcast";
+    if ( o == LOCAL && r == LOCAL )
+        return INTERNAL;
+    else if ( o == LOCAL && r == EXTERNAL )
+        return EGRESS;
+    else if ( o == EXTERNAL && r == LOCAL )
+        return INGRESS;
+    else if ( o == EXTERNAL && r == EXTERNAL )
+        return EXTERNAL;
+    else if ( o == LOCAL && r == NEIGHBOR ) 
+        return TO_NEIGHBOR;
+    else if ( o == NEIGHBOR && r == LOCAL )
+        return FROM_NEIGHBOR;
+    else if ( o == LOCAL && r == MULTICAST)
+        return MULTICAST;
+    else if ( o == LOCAL && r == BROADCAST)
+        return BROADCAST;
     else 
-        return "unknown";
+        return UNKNOWN;
     }
 
 event connection_state_remove(c: connection) 
     {
-    # 
+    # Populate orientation field 
     c$conn$orientation = get_oriented(c$id);
     }
